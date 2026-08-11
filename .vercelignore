@@ -1,0 +1,24 @@
+# Keep the serverless bundle small and free of local-only files.
+
+# Local database — never upload it, and it cannot work on Vercel anyway
+# (see the deployment notes in README.md).
+padhai.db
+padhai.db-wal
+padhai.db-shm
+studyai.db
+studyai.db-wal
+studyai.db-shm
+
+# Secrets stay local; configure them as Environment Variables in Vercel.
+.env
+
+# Local tooling and build artefacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+.claude/
+*.pdf
+
+# Optional heavy dependency list, not installed on Vercel
+backend/requirements-audio.txt

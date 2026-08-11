@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Padhai — your AI study workspace</title>
+  <meta name="description" content="Upload your notes and get instant summaries, mind maps, flashcards, practice questions, exams and a viva examiner — all on free services." />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2fa" media="(prefers-color-scheme: light)" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b8cff'/%3E%3Cstop offset='1' stop-color='%237c5bff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Segoe UI,system-ui,sans-serif' font-size='58' font-weight='700' fill='%23fff' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script>
+    /* Set the theme before first paint so there is no flash of the wrong one. */
+    (function () {
+      var t;
+      try { t = localStorage.getItem("padhai_theme") || localStorage.getItem("studyai_theme"); } catch (e) { /* private mode */ }
+      if (!t) t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+</head>
+<body>
+
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="#/home" aria-label="Padhai home">
+      <span class="brand-mark">P</span>
+      <span class="brand-name">Padhai</span>
+    </a>
+
+    <nav class="site-nav" aria-label="Site">
+      <a href="#/home" data-page="home">Home</a>
+      <a href="#/about" data-page="about">About</a>
+      <a href="#/contact" data-page="contact">Contact</a>
+      <a href="#" class="site-nav-app">Workspace</a>
+    </nav>
+    <div class="topbar-right">
+      <button id="game-chip" class="badge badge-btn game-chip" title="Your progress">
+        <span id="game-level">Lv 1</span>
+        <span class="game-xpbar"><span id="game-xpfill"></span></span>
+        <span id="game-streak">🔥 0</span>
+      </button>
+
+      <!-- Everything that used to crowd the bar now lives in one tidy menu -->
+      <div class="apps-wrap">
+        <button id="apps-btn" class="badge badge-btn" type="button"
+                aria-haspopup="true" aria-expanded="false" title="Menu">
+          <span data-icon="grid" data-size="15"></span> Menu
+        </button>
+        <div id="apps-menu" class="apps-menu" hidden>
+          <button id="report-btn" type="button">
+            <span data-icon="report" data-size="17"></span> My report
+          </button>
+          <button id="notes-btn" type="button">
+            <span data-icon="sticky" data-size="17"></span> Sticky notes
+          </button>
+          <button id="tools-btn" type="button">
+            <span data-icon="calculator" data-size="17"></span> Calculator
+          </button>
+          <div class="apps-page-links">
+            <a href="#/home">Home</a>
+            <a href="#/about">About</a>
+            <a href="#/contact">Contact</a>
+          </div>
+          <span id="ai-badge-menu" class="apps-status" title="AI status"></span>
+        </div>
+      </div>
+
+      <span id="ai-badge" class="badge badge-muted badge-dot" title="AI status">checking…</span>
+      <div class="auth-wrap">
+        <button id="auth-chip" class="badge badge-btn" type="button">Sign in</button>
+        <div id="auth-menu" class="auth-menu" hidden>
+          <button id="auth-logout" type="button">Sign out</button>
+        </div>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme"></button>
+    </div>
+  </header>
+
+  <!-- Sign in / create account -->
+  <div id="auth-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <button id="auth-close" class="modal-close" type="button" aria-label="Close">✕</button>
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="empty-hint">
+        Accounts are optional. Signing in keeps your documents, mind maps and
+        sticky notes between visits — everything you made as a guest comes with you.
+      </p>
+      <form id="auth-form" autocomplete="on">
+        <label id="auth-name-row" hidden>Name
+          <input id="auth-name" type="text" autocomplete="name" maxlength="60" placeholder="optional" />
+        </label>
+        <label>Email
+          <input id="auth-email" type="email" autocomplete="email" required maxlength="160" />
+        </label>
+        <label>Password
+          <input id="auth-password" type="password" autocomplete="current-password"
+                 required minlength="8" maxlength="200" placeholder="at least 8 characters" />
+        </label>
+        <p id="auth-error" class="auth-error" hidden></p>
+        <button id="auth-submit" class="btn-primary" type="submit">Sign in</button>
+      </form>
+      <p id="auth-swap" class="empty-hint auth-swap"></p>
+    </div>
+  </div>
+
+  <!-- Progress popover (gamification) -->
+  <div id="game-panel" class="game-panel" hidden>
+    <div class="game-panel-head">
+      <strong id="gp-title">Level 1 Scholar</strong>
+      <button id="gp-close" class="icon-x" title="Close" aria-label="Close progress panel">✕</button>
+    </div>
+    <div class="gp-stats">
+      <div><span id="gp-xp">0</span><label>XP</label></div>
+      <div><span id="gp-level">1</span><label>Level</label></div>
+      <div><span id="gp-streak">0</span><label>Day streak</label></div>
+    </div>
+    <div class="gp-next"><div id="gp-nextbar"></div></div>
+    <p id="gp-nexttext" class="empty-hint"></p>
+    <h2 class="section-title">Badges</h2>
+    <div id="gp-badges" class="gp-badges"></div>
+  </div>
+
+  <div id="toast-stack" class="toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <main class="layout" id="main">
+
+    <!-- ============ LEFT: upload + documents ============ -->
+    <aside class="sidebar" aria-label="Your library">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload study material — PDF, TXT, CSV or audio">
+        <div class="dropzone-icon" data-icon="upload" data-size="30"></div>
+        <p class="dropzone-title">Upload study material</p>
+        <p class="dropzone-hint">PDF, TXT, CSV or audio lecture (MP3/WAV/M4A) — drag &amp; drop or click</p>
+        <input id="file-input" type="file" accept=".pdf,.txt,.csv,.mp3,.wav,.m4a,.ogg,.flac,.webm" hidden multiple />
+      </div>
+
+      <form id="url-form" class="url-form" autocomplete="off">
+        <input type="text" id="url-input"
+               placeholder="🌐 or paste a web link (article, notes…)" />
+        <button type="submit" class="btn-secondary">Import</button>
+      </form>
+
+      <div id="upload-status" class="upload-status" hidden></div>
+
+      <h2 class="section-title">Your documents</h2>
+
+      <!-- Everything uploaded is always part of the working context -->
+      <div id="doc-tools" class="doc-tools" hidden>
+        <span id="pick-count" class="doc-tools-count">0 documents</span>
+      </div>
+
+      <ul id="doc-list" class="doc-list"></ul>
+      <p id="doc-empty" class="empty-hint">
+        Nothing uploaded yet. Add your chapters — every file you upload is used
+        automatically, with nothing to tick.
+      </p>
+    </aside>
+
+    <!-- ============ RIGHT: study area ============ -->
+    <section class="study-area">
+
+      <!-- Home / About / Contact live here (built by pages.js) -->
+      <div id="page-view" class="page-view" hidden></div>
+
+      <div id="welcome" class="welcome study-view">
+        <div id="orbit" class="orbit" aria-hidden="true"></div>
+        <h1>Upload anything you're studying.<br/>Get an instant AI exam-prep system.</h1>
+        <ul class="welcome-points">
+          <li style="--i:0"><span data-icon="summary"></span> Chapter summaries &amp; key points</li>
+          <li style="--i:1"><span data-icon="chat"></span> Ask questions — answers come only from <em>your</em> material</li>
+          <li style="--i:2"><span data-icon="audio"></span> Upload audio lectures — transcribed locally, then studied like notes</li>
+          <li style="--i:3"><span data-icon="flashcards"></span> Flashcards, practice questions &amp; full timed exams</li>
+          <li style="--i:4"><span data-icon="report"></span> Automatic progress reports — weak points, thinking time &amp; a 14-day plan</li>
+          <li style="--i:5"><span data-icon="sticky"></span> A sticky-notes board you can stick anything to</li>
+          <li style="--i:6"><span data-icon="shield"></span> Works without an account — sign in only if you want it saved</li>
+        </ul>
+      </div>
+
+      <div id="workspace" class="study-view" hidden>
+        <div class="doc-header">
+          <h1 id="doc-title"></h1>
+          <div id="doc-chips" class="doc-chips" hidden></div>
+          <span id="doc-meta" class="doc-meta"></span>
+        </div>
+
+        <nav class="tabs" id="tabs" role="tablist" aria-label="Study views">
+          <button class="tab active" data-tab="summary">Summary</button>
+          <button class="tab" data-tab="keypoints">Key points</button>
+          <button class="tab" data-tab="definitions">Definitions</button>
+          <button class="tab" data-tab="mindmap">Mind map</button>
+          <button class="tab" data-tab="flashcards">Flashcards</button>
+          <button class="tab" data-tab="practice">Practice</button>
+          <button class="tab" data-tab="exam">Exam</button>
+          <button class="tab" data-tab="viva">Viva</button>
+          <button class="tab" data-tab="chat">Chat</button>
+        </nav>
+
+        <!-- Analysis panels -->
+        <div id="panel-analysis" class="panel">
+          <div id="analysis-content" class="markdown"></div>
+        </div>
+
+        <!-- Flashcards panel -->
+        <div id="panel-flashcards" class="panel" hidden>
+          <form id="fc-form" class="gen-form">
+            <label>Cards
+              <select id="fc-count">
+                <option>5</option><option selected>10</option><option>15</option><option>20</option>
+              </select>
+            </label>
+            <label>Difficulty
+              <select id="fc-difficulty">
+                <option value="mixed" selected>Mixed</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <button type="submit" class="btn-primary">Generate flashcards</button>
+          </form>
+
+          <div id="fc-empty" class="empty-state">
+            <span class="empty-state-icon" data-icon="flashcards" data-size="30"></span>
+            <p class="empty-state-title">No deck yet</p>
+            <p class="empty-state-hint">
+              Generate a deck above, then use <kbd>←</kbd> <kbd>→</kbd> to move
+              between cards and <kbd>Space</kbd> to flip.
+            </p>
+          </div>
+
+          <div id="fc-viewer" hidden>
+            <div class="fc-progress">
+              <span id="fc-counter">1 / 10</span>
+              <div class="fc-bar"><div id="fc-bar-fill"></div></div>
+            </div>
+            <div id="fc-card" class="fc-card" title="Click to flip">
+              <div class="fc-inner">
+                <div class="fc-face fc-front">
+                  <span class="fc-label">Question</span>
+                  <p id="fc-question"></p>
+                  <span class="fc-hint">click to reveal answer</span>
+                </div>
+                <div class="fc-face fc-back">
+                  <span class="fc-label">Answer</span>
+                  <p id="fc-answer"></p>
+                </div>
+              </div>
+            </div>
+            <div class="fc-meta">
+              <span id="fc-difficulty-badge" class="pill"></span>
+              <span id="fc-tags"></span>
+            </div>
+            <div class="fc-nav">
+              <button id="fc-prev" class="btn-secondary">← Previous</button>
+              <button id="fc-flip" class="btn-primary">Flip</button>
+              <button id="fc-next" class="btn-secondary">Next →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Practice panel -->
+        <div id="panel-practice" class="panel" hidden>
+          <form id="pr-form" class="gen-form gen-form-wide">
+            <fieldset class="type-picker">
+              <legend>Question types</legend>
+              <label><input type="checkbox" name="qtype" value="mcq" checked /> MCQ</label>
+              <label><input type="checkbox" name="qtype" value="fillblank" /> Fill blanks</label>
+              <label><input type="checkbox" name="qtype" value="match" /> Match</label>
+              <label><input type="checkbox" name="qtype" value="truefalse" /> True/False</label>
+              <label><input type="checkbox" name="qtype" value="short" /> Short answer</label>
+              <label><input type="checkbox" name="qtype" value="long" /> Long answer</label>
+            </fieldset>
+            <div class="gen-row">
+              <label>Questions
+                <select id="pr-count">
+                  <option>5</option><option selected>10</option><option>15</option><option>20</option>
+                </select>
+              </label>
+              <label>Difficulty
+                <select id="pr-difficulty">
+                  <option value="mixed" selected>Mixed</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label class="grow">Topic (optional)
+                <input type="text" id="pr-topic" placeholder="e.g. Motion" maxlength="200" />
+              </label>
+            </div>
+            <label class="gen-instructions">
+              <span>Custom instructions for the AI <em>(optional)</em></span>
+              <textarea id="pr-instructions" rows="2" maxlength="600"
+                placeholder="e.g. Only numerical problems · give hints in each question · keep them one-liners · base MCQs on real-life examples"></textarea>
+            </label>
+            <div class="gen-row" style="justify-content:flex-end">
+              <button type="submit" class="btn-primary">Generate</button>
+            </div>
+          </form>
+          <div id="pr-score" class="pr-score" hidden></div>
+          <div id="pr-questions"></div>
+          <div id="pr-empty" class="empty-state">
+            <span class="empty-state-icon" data-icon="practice" data-size="30"></span>
+            <p class="empty-state-title">No questions yet</p>
+            <p class="empty-state-hint">
+              Pick the question types you want above and press <b>Generate</b>.
+              Add a custom instruction to steer them — “only numericals”,
+              “one-line answers”, anything.
+            </p>
+          </div>
+        </div>
+
+        <!-- Exam panel -->
+        <div id="panel-exam" class="panel" hidden>
+          <!-- Setup view -->
+          <div id="ex-setup">
+            <form id="ex-form" class="gen-form">
+              <label>Total marks
+                <select id="ex-marks">
+                  <option>20</option><option selected>30</option>
+                  <option>40</option><option>60</option><option>80</option>
+                </select>
+              </label>
+              <label>Difficulty
+                <select id="ex-difficulty">
+                  <option value="mixed" selected>Mixed</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label>Time limit
+                <select id="ex-time">
+                  <option value="15">15 min</option>
+                  <option value="30" selected>30 min</option>
+                  <option value="45">45 min</option>
+                  <option value="60">60 min</option>
+                  <option value="90">90 min</option>
+                </select>
+              </label>
+              <label class="grow">Chapter / topic (optional)
+                <input type="text" id="ex-topic" placeholder="whole document" maxlength="200" />
+              </label>
+              <label class="gen-instructions" style="width:100%">
+                <span>Custom instructions for the AI <em>(optional)</em></span>
+                <textarea id="ex-instructions" rows="2" maxlength="600"
+                  placeholder="e.g. More numericals in Section E · avoid diagram-based questions · focus long answers on applications"></textarea>
+              </label>
+              <button type="submit" class="btn-primary">Create exam paper</button>
+            </form>
+            <p class="empty-hint">The paper has five sections: MCQ, fill in the blanks,
+              match the following, short answers and long answers. Answers are kept on
+              the server until you submit — no peeking in the network tab. 😉</p>
+          </div>
+
+          <!-- Taking view (built by exam.js) -->
+          <div id="ex-taking" hidden>
+            <div class="ex-topbar">
+              <div>
+                <strong id="ex-title"></strong>
+                <span id="ex-info" class="doc-meta"></span>
+              </div>
+              <div class="ex-topbar-right">
+                <span id="ex-timer" class="ex-timer">30:00</span>
+                <button id="ex-submit" class="btn-primary">Submit paper</button>
+              </div>
+            </div>
+            <nav id="ex-palette" class="ex-palette" aria-label="Question navigation"></nav>
+            <div id="ex-sections"></div>
+          </div>
+
+          <!-- Report view (built by exam.js) -->
+          <div id="ex-report" hidden></div>
+        </div>
+
+        <!-- Viva panel — the AI asks, you answer -->
+        <div id="panel-viva" class="panel" hidden>
+          <!-- Setup -->
+          <div id="vv-setup">
+            <form id="vv-form" class="gen-form gen-form-wide">
+              <p class="empty-hint" style="width:100%;margin-bottom:2px">
+                The AI plays an examiner: it asks one question at a time about your
+                material, you answer in your own words, and it marks each answer with
+                feedback and the ideal response.
+              </p>
+              <div class="gen-row">
+                <label>Questions
+                  <select id="vv-count">
+                    <option>5</option><option selected>8</option><option>10</option><option>12</option>
+                  </select>
+                </label>
+                <label>Difficulty
+                  <select id="vv-difficulty">
+                    <option value="mixed" selected>Mixed</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </label>
+                <label class="grow">Focus (optional)
+                  <input type="text" id="vv-focus" placeholder="whole document" maxlength="200" />
+                </label>
+              </div>
+              <label class="gen-instructions">
+                <span>Custom instructions for the examiner <em>(optional)</em></span>
+                <textarea id="vv-instructions" rows="2" maxlength="600"
+                  placeholder="e.g. Ask only conceptual 'why' questions · one numerical each round · be strict on definitions"></textarea>
+              </label>
+              <div class="gen-row" style="justify-content:flex-end">
+                <button type="submit" class="btn-primary">
+                  <span data-icon="viva" data-size="16"></span> Start viva
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Running viva (built by viva.js) -->
+          <div id="vv-run" hidden>
+            <div class="vv-progress">
+              <span id="vv-counter">1 / 8</span>
+              <div class="fc-bar"><div id="vv-bar-fill"></div></div>
+              <span id="vv-score" class="vv-score">0 / 0</span>
+              <button id="vv-quit" class="btn-secondary">End viva</button>
+            </div>
+            <div id="vv-thread" class="vv-thread"></div>
+            <form id="vv-answer-form" class="vv-answer-form" autocomplete="off">
+              <textarea id="vv-answer" class="q-textarea" rows="3"
+                placeholder="Type your answer, then press Answer (or Ctrl+Enter)…"></textarea>
+              <div class="vv-answer-actions">
+                <button type="button" id="vv-skip" class="btn-secondary">Skip</button>
+                <button type="submit" id="vv-submit" class="btn-primary">Answer →</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Summary (built by viva.js) -->
+          <div id="vv-summary" hidden></div>
+        </div>
+
+        <!-- Chat panel -->
+        <div id="panel-chat" class="panel chat-panel" hidden>
+          <div id="chat-messages" class="chat-messages">
+            <div class="chat-msg assistant">
+              <div class="markdown">Ask me anything about this document — I'll answer only from what's in it.</div>
+            </div>
+          </div>
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <input id="chat-input" type="text" placeholder="e.g. Explain the main idea of chapter 2…" maxlength="2000" />
+            <button type="submit" id="chat-send">Ask</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ============ Progress report (account-wide, independent of documents) ============ -->
+      <div id="report-view" class="study-view" hidden>
+        <div class="doc-header">
+          <h1><span data-icon="report" data-size="22"></span> My progress report</h1>
+          <button id="rp-back" class="btn-secondary">← Back</button>
+        </div>
+
+        <!-- Shown to guests -->
+        <div id="rp-guest" hidden>
+          <div class="rp-guest-card">
+            <p><strong>Sign in to build your report.</strong></p>
+            <p class="empty-hint">Once you're signed in, every exam you take and every
+              practice question you answer is noted down automatically — your weak
+              points, how long each question takes you, and how you improve over time.
+              The AI then writes your personal report with a 14-day study plan.</p>
+            <button id="rp-signin" class="btn-primary">Sign in</button>
+          </div>
+        </div>
+
+        <!-- Shown to signed-in students -->
+        <div id="rp-main" hidden>
+          <div id="rp-empty" class="rp-guest-card" hidden>
+            <p><strong>Nothing to report yet.</strong></p>
+            <p class="empty-hint">Take an exam or answer practice questions on any
+              document — your results land here automatically. ✍️</p>
+          </div>
+
+          <div id="rp-dash" hidden>
+            <!-- Stat tiles -->
+            <div id="rp-tiles" class="rp-tiles"></div>
+
+            <!-- Charts -->
+            <div class="rp-grid">
+              <div class="rp-card">
+                <h2 class="section-title">📈 Score trend</h2>
+                <div id="rp-trend"></div>
+              </div>
+              <div class="rp-card">
+                <h2 class="section-title">🎯 Accuracy by question type</h2>
+                <div id="rp-types"></div>
+              </div>
+            </div>
+
+            <div class="rp-grid">
+              <div class="rp-card">
+                <h2 class="section-title">⏱️ Thinking time per type</h2>
+                <div id="rp-times"></div>
+              </div>
+              <div class="rp-card">
+                <h2 class="section-title">⚠️ Weak topics</h2>
+                <div id="rp-weak"></div>
+              </div>
+            </div>
+
+            <div class="rp-card" id="rp-slow-card" hidden>
+              <h2 class="section-title">🐢 Questions that took you longest</h2>
+              <div id="rp-slow"></div>
+            </div>
+
+            <!-- Full AI report -->
+            <div class="rp-genrow">
+              <button id="rp-generate" class="btn-primary">
+                ✨ Generate my full AI report
+              </button>
+              <span id="rp-gen-meta" class="doc-meta"></span>
+            </div>
+
+            <div id="rp-report" hidden>
+              <div id="rp-headline" class="rp-headline"></div>
+              <div id="rp-sw" class="rp-sw"></div>
+              <div id="rp-narrative" class="markdown rp-narrative"></div>
+              <h2 class="section-title">🗓️ Your next 14 days</h2>
+              <div id="rp-plan"></div>
+            </div>
+
+            <!-- Coach chat -->
+            <div class="rp-card rp-chat-card">
+              <h2 class="section-title">💬 Ask your coach</h2>
+              <p class="empty-hint">Ask anything about your performance —
+                “what should I revise first?”, “why is my MCQ score low?”</p>
+              <div id="rp-chat-messages" class="chat-messages rp-chat-messages"></div>
+              <form id="rp-chat-form" class="chat-form" autocomplete="off">
+                <input id="rp-chat-input" type="text"
+                       placeholder="e.g. What should I focus on this week?" maxlength="2000" />
+                <button type="submit" id="rp-chat-send">Ask</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ Sticky notes board ============ -->
+      <div id="notes-view" class="study-view" hidden>
+        <div class="doc-header notes-header">
+          <h1><span data-icon="sticky" data-size="22"></span> Sticky notes</h1>
+          <span id="notes-count" class="doc-meta">0 notes</span>
+          <div class="notes-actions">
+            <button id="notes-add" class="btn-primary">
+              <span data-icon="plus" data-size="16"></span> New note
+            </button>
+            <button id="notes-clear" class="btn-secondary">Clear board</button>
+            <button id="notes-back" class="btn-secondary">← Back</button>
+          </div>
+        </div>
+        <div id="notes-board" class="notes-board">
+          <p id="notes-hint" class="notes-hint">
+            Double-click anywhere to stick a note here.<br/>
+            <small>Drag them wherever you like — they stay put.</small>
+          </p>
+        </div>
+      </div>
+
+      <!-- Warm-up progress: every view is generated up front, in parallel -->
+      <div id="warm-bar" class="warm" hidden>
+        <div class="warm-head">
+          <span id="warm-text">Preparing your material…</span>
+          <b id="warm-count">0/5</b>
+        </div>
+        <div class="warm-track"><span id="warm-fill"></span></div>
+      </div>
+
+      <div id="loader" class="loader" hidden>
+        <div class="spinner"></div>
+        <p id="loader-text">Thinking…</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <span class="site-footer-brand">Padhai</span>
+      <nav aria-label="Footer">
+        <a href="#/home">Home</a>
+        <a href="#/about">About</a>
+        <a href="#/contact">Contact</a>
+      </nav>
+      <span class="site-footer-note">Runs on free services · your material stays yours</span>
+    </div>
+  </footer>
+
+  <!-- Animated circular navigation dock (built by ui.js) -->
+  <nav id="radial-nav" class="radial" aria-label="Quick navigation">
+    <button id="radial-toggle" class="radial-core" type="button"
+            aria-expanded="false" aria-controls="radial-items"
+            title="Quick navigation — press N"></button>
+    <div id="radial-items" class="radial-items"></div>
+  </nav>
+
+  <script src="js/formula.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/mindmap.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/notes.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/flashcards.js"></script>
+  <script src="js/practice.js"></script>
+  <script src="js/exam.js"></script>
+  <script src="js/viva.js"></script>
+  <script src="js/tts.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/pages.js"></script>
+</body>
+</html>

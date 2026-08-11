@@ -1,0 +1,20 @@
+# Secrets — never commit API keys
+.env
+
+# Local database (accounts, password hashes, notes, cached AI results).
+# The project was renamed, so both filenames are ignored.
+padhai.db
+padhai.db-wal
+padhai.db-shm
+studyai.db
+studyai.db-wal
+studyai.db-shm
+
+# Vercel
+.vercel/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

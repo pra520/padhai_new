@@ -1,0 +1,16 @@
+# Vercel installs Python dependencies from the requirements.txt in the repo
+# root. The real list lives in backend/requirements.txt so there is only ever
+# one place to edit; pip resolves this path relative to this file.
+#
+# Audio transcription (backend/requirements-audio.txt) is deliberately NOT
+# included: faster-whisper and its model weights are far larger than Vercel's
+# serverless bundle limit. audio_service imports it lazily and reports the
+# feature as unavailable, so every other feature works unchanged.
+
+flask>=3.0
+pypdf>=4.0
+requests>=2.31
+python-dotenv>=1.0
+ddgs>=9.0       
+
+ # free web search (no API key) for past-paper discovery

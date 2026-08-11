@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(py --version)",
+      "PowerShell(pip --version)",
+      "Bash(python -V)",
+      "Bash(echo \"local python: $\\(python -V\\)\")",
+      "Bash(python -X utf8 -c ' *)",
+      "Bash(python -X utf8 -)"
+    ]
+  }
+}

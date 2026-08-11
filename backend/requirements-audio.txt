@@ -1,0 +1,2 @@
+# Optional: free, local speech-to-text for audio lectures (no API, no billing)
+faster-whisper>=1.0

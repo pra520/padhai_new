@@ -1,0 +1,37 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "padhai",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "backend/app.py"
+      ],
+      "port": 5004
+    },
+    {
+      "name": "monopoly",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8390",
+        "--directory",
+        "C:/Users/Hp/OneDrive/Desktop/m/monopoly"
+      ],
+      "port": 8390
+    },
+    {
+      "name": "nomercy",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8391",
+        "--directory",
+        "C:/Users/Hp/OneDrive/Desktop/m/monopoly-deal-no-mercy"
+      ],
+      "port": 8391
+    }
+  ]
+}
