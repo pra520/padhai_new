@@ -1,1 +1,7 @@
-
+# Local development convenience: `pip install -r backend/requirements.txt`
+# still works from inside backend/. The actual list lives in the repository
+# root because that is the only file Vercel reads.
+#
+# pip resolves this include relative to THIS file, so it works locally. Vercel
+# never reads this file — it installs from the root requirements.txt.
+-r ../requirements.txt

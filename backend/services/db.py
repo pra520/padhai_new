@@ -30,6 +30,17 @@ def _db_path() -> Path:
     if override:
         return Path(override).expanduser()
 
+    # On a serverless host the deployment bundle is read-only, so creating the
+    # database next to the code fails with "unable to open database file" and
+    # every account/upload/notes route 500s. /tmp is the one writable path.
+    # Vercel sets VERCEL=1 in every function environment.
+    #
+    # This storage is per-instance and cleared when the instance is recycled,
+    # so accounts do not survive a cold start. Point PADHAI_DB at a hosted
+    # database (or a mounted volume) for real persistence.
+    if os.getenv("VERCEL"):
+        return Path("/tmp/padhai.db")
+
     root = Path(__file__).resolve().parent.parent.parent
     new_path, old_path = root / "padhai.db", root / "studyai.db"
     if not new_path.exists() and old_path.exists():

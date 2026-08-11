@@ -1,16 +1,24 @@
-# Vercel installs Python dependencies from the requirements.txt in the repo
-# root. The real list lives in backend/requirements.txt so there is only ever
-# one place to edit; pip resolves this path relative to this file.
+# Python dependencies for the Padhai backend.
+#
+# Vercel installs from the requirements.txt in the repository root, so this is
+# the single source of truth. It deliberately contains no "-r other/file.txt"
+# include: Vercel's builder resolves that path from the build root rather than
+# from this file, which is what broke the install previously.
+#
+# Every entry below is imported by backend/ — nothing here is speculative.
+#   flask         -> backend/app.py
+#   pypdf         -> services/extractor.py   (PDF text extraction)
+#   requests      -> services/providers.py, ai_service.py, mail.py, web.py
+#   python-dotenv -> backend/config.py       (loads .env for local runs)
+#   ddgs          -> services/search.py      (keyless past-paper search)
 #
 # Audio transcription (backend/requirements-audio.txt) is deliberately NOT
-# included: faster-whisper and its model weights are far larger than Vercel's
-# serverless bundle limit. audio_service imports it lazily and reports the
+# included: faster-whisper and its model weights exceed Vercel's serverless
+# bundle limit. services/audio_service.py imports it lazily and reports the
 # feature as unavailable, so every other feature works unchanged.
 
 flask>=3.0
 pypdf>=4.0
 requests>=2.31
 python-dotenv>=1.0
-ddgs>=9.0       
-
- # free web search (no API key) for past-paper discovery
+ddgs>=9.0

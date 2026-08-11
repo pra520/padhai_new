@@ -15,6 +15,11 @@ Adding `backend/` to `sys.path` here reproduces the local import environment
 without moving a single file or changing `backend/app.py`. The Flask instance
 is then imported — not recreated — so every route, service and configuration
 behaves exactly as it does locally.
+
+Routing: vercel.json rewrites /api/* to this function. A Vercel rewrite only
+chooses which function handles the request — the original path is still what
+the function receives — so Flask sees /api/auth/me and matches its own
+@app.get("/api/auth/me"). No route in backend/app.py needs an alias.
 """
 import sys
 from pathlib import Path
@@ -29,10 +34,10 @@ if str(BACKEND_DIR) not in sys.path:
 # module-level WSGI callable named `app` and serves it. `app.py` guards its
 # `app.run(...)` behind `if __name__ == "__main__"`, so importing it never
 # starts a development server.
+#
+# Do NOT also export `handler`: Vercel's bootstrap checks for `handler` first
+# and requires it to be a BaseHTTPRequestHandler *subclass*. Pointing it at a
+# Flask instance fails that check instead of falling through to WSGI.
 from app import app  # noqa: E402  (path setup must run first)
 
-# Vercel looks for `app`; some templates look for `handler`. Expose both so the
-# deployment works regardless of which the runtime picks up.
-handler = app
-
-__all__ = ["app", "handler"]
+__all__ = ["app"]
