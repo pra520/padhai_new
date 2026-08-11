@@ -1,8 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
 
-  "//": "Static frontend from frontend/, Flask backend as one Python function.",
-
   "framework": null,
   "outputDirectory": "frontend",
 
