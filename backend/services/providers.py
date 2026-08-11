@@ -3,8 +3,8 @@
 Every AI feature calls `generate(messages, max_tokens)`. Behind that one
 function sits a rotation of FREE providers, tried in priority order:
 
-    1. Google Gemini (free tier)         GEMINI_API_KEY
-    2. OpenRouter free models            OPENROUTER_API_KEY
+    1. OpenRouter free models            OPENROUTER_API_KEY
+    2. Google Gemini (free tier)         GEMINI_API_KEY
     3. Groq free tier                    GROQ_API_KEY
     4. Hugging Face Inference (free)     HF_TOKEN
 
@@ -221,8 +221,9 @@ class HuggingFace(_OpenAICompatible):
         return Config.HF_TOKEN
 
 
-# Priority order. Gemini first: best free limits and strongest small model.
-_PROVIDERS: list[Provider] = [Gemini(), OpenRouter(), Groq(), HuggingFace()]
+# Priority order. OpenRouter first: its free roster is the widest, so it is
+# the least likely to be the provider that runs out. Gemini backs it up.
+_PROVIDERS: list[Provider] = [OpenRouter(), Gemini(), Groq(), HuggingFace()]
 _lock = threading.Lock()
 
 

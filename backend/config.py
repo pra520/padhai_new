@@ -120,6 +120,10 @@ class Config:
     # How much text is handed to the model for whole-document tasks
     # (summary, key points, mind map). Larger is more complete but slower and
     # more likely to hit a free model's context limit.
+    #
+    # 0 = no cap, send the document whole. Only do that on a model whose
+    # context window can hold it: a prompt past the window is rejected, every
+    # provider then fails, and the app drops to local (non-AI) mode.
     AI_CONTEXT_CHARS = int(os.getenv("AI_CONTEXT_CHARS", "60000"))
 
     # Sticky notes per account.

@@ -225,7 +225,10 @@ Nothing is capped for product reasons — every limit is a tunable in `.env`.
 | `DOC_TTL_HOURS` | `6` | Guest document lifetime (signed-in documents never expire) |
 
 `AI_CONTEXT_CHARS` is the only one with a real trade-off: it is bounded by
-what a free model will accept in one prompt. When the material exceeds it the
+what a free model will accept in one prompt. Setting it to `0` removes the
+cap, but that is not the same as unlimited context — the model's own window
+still applies, and a prompt over it is rejected outright, which fails every
+provider and drops the app into local (non-AI) mode. When the material exceeds it the
 budget is **shared across every document** — opening, middle and end of each —
 rather than truncated at the cut-off, so a chapter is never silently omitted
 from a summary. Question answering is unaffected: retrieval already selects

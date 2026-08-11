@@ -59,7 +59,13 @@ def _doc_context(doc: Document) -> str:
     and the omission is stated in the text the model sees.
     """
     budget = Config.AI_CONTEXT_CHARS
-    if len(doc.text) <= budget:
+    # AI_CONTEXT_CHARS=0 removes the cap and sends the document whole. There is
+    # no such thing as an unlimited prompt, though: every model has a fixed
+    # context window, and one prompt over it is rejected rather than trimmed.
+    # When that happens the whole provider rotation fails and the app falls
+    # back to local extractive mode, so 0 makes big documents worse, not
+    # better. Raise the number instead, to what your model actually accepts.
+    if budget <= 0 or len(doc.text) <= budget:
         return doc.text
 
     members = doc.meta.get("members") or []
