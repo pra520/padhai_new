@@ -8,6 +8,7 @@ summary, mind map and flashcards straight from disk.
 One connection is shared across Flask's threads (`check_same_thread=False`)
 with a lock around writes; WAL mode keeps concurrent reads fast.
 """
+import base64
 import json
 import logging
 import os
@@ -15,6 +16,8 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
+
+import requests
 
 log = logging.getLogger("padhai.db")
 
@@ -171,8 +174,148 @@ CREATE INDEX IF NOT EXISTS idx_messages_ip ON messages(ip, created);
 """
 
 
-def connect() -> sqlite3.Connection:
+# ---------------------------------------------------------------------------
+# Turso (libSQL) — shared storage for serverless
+# ---------------------------------------------------------------------------
+#
+# A local SQLite file cannot work on Vercel: /tmp belongs to one instance, so
+# a document uploaded through instance A is invisible to instance B and comes
+# back as "Document not found (it may have expired)". Turso is SQLite over
+# HTTP, so the schema, the `?` placeholders and every query in services/ stay
+# exactly as they are — only the transport below changes.
+#
+# Configured => remote. Unset => the local SQLite file, unchanged, for dev.
+
+TURSO_URL = os.getenv("TURSO_DATABASE_URL", "").strip()
+TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+REMOTE = bool(TURSO_URL and TURSO_TOKEN)
+
+# One session per thread: warm.start() precomputes five views in parallel, and
+# requests.Session is not guaranteed thread-safe. Thread-local keeps connection
+# reuse without sharing a pool across those workers.
+_local = threading.local()
+_schema_ready = False
+
+
+def _http() -> requests.Session:
+    session = getattr(_local, "session", None)
+    if session is None:
+        session = _local.session = requests.Session()
+    return session
+
+
+def _endpoint() -> str:
+    """Turso hands out libsql:// URLs; the HTTP API lives on https://."""
+    url = TURSO_URL
+    for prefix in ("libsql://", "wss://", "ws://"):
+        if url.startswith(prefix):
+            url = "https://" + url[len(prefix):]
+    if not url.startswith("http"):
+        url = "https://" + url
+    return url.rstrip("/") + "/v2/pipeline"
+
+
+class Row(dict):
+    """Stands in for sqlite3.Row. Every caller reads columns by name."""
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+def _encode(value):
+    """Python value -> libSQL argument. Integers travel as strings (64-bit)."""
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bool):            # bool is an int subclass — check first
+        return {"type": "integer", "value": str(int(value))}
+    if isinstance(value, int):
+        return {"type": "integer", "value": str(value)}
+    if isinstance(value, float):
+        return {"type": "float", "value": value}
+    if isinstance(value, (bytes, bytearray)):
+        return {"type": "blob", "value": base64.b64encode(bytes(value)).decode()}
+    return {"type": "text", "value": str(value)}
+
+
+def _decode(cell):
+    kind = cell.get("type")
+    if kind == "null":
+        return None
+    value = cell.get("value")
+    if kind == "integer":
+        return int(value)
+    if kind == "float":
+        return float(value)
+    if kind == "blob":
+        return base64.b64decode(value)
+    return value
+
+
+def _pipeline(statements: list[tuple[str, tuple]]) -> list[list[Row]]:
+    """Run statements in order on one stream and return each one's rows.
+
+    Foreign keys are re-enabled per call: every pipeline is its own stream, so
+    the pragma does not carry over, and ON DELETE CASCADE would silently stop
+    working — orphaning analyses behind deleted documents.
+    """
+    requests_body = [{"type": "execute", "stmt": {"sql": "PRAGMA foreign_keys=ON"}}]
+    requests_body += [
+        {"type": "execute",
+         "stmt": {"sql": sql, "args": [_encode(p) for p in params]}}
+        for sql, params in statements
+    ]
+    requests_body.append({"type": "close"})
+
+    resp = _http().post(
+        _endpoint(), json={"requests": requests_body},
+        headers={"Authorization": f"Bearer {TURSO_TOKEN}"}, timeout=30,
+    )
+    resp.raise_for_status()
+
+    out: list[list[Row]] = []
+    for item in resp.json().get("results", []):
+        if item.get("type") == "error":
+            message = (item.get("error") or {}).get("message", "unknown error")
+            raise RuntimeError(f"Turso rejected a statement: {message}")
+        result = (item.get("response") or {}).get("result")
+        if result is None:
+            continue
+        cols = [c.get("name") for c in result.get("cols", [])]
+        out.append([Row(zip(cols, (_decode(c) for c in row)))
+                    for row in result.get("rows", [])])
+    return out[1:]          # drop the pragma's own (empty) result
+
+
+def _remote_schema() -> None:
+    """Create the tables once per process."""
+    global _schema_ready
+    if _schema_ready:
+        return
+    with _lock:
+        if _schema_ready:
+            return
+        # Full-line SQL comments are stripped first: two of them contain a
+        # semicolon, which would otherwise split a statement mid-sentence.
+        body = "\n".join(line for line in SCHEMA.splitlines()
+                         if not line.strip().startswith("--"))
+        _pipeline([(stmt.strip(), ()) for stmt in body.split(";") if stmt.strip()])
+        _schema_ready = True
+        log.info("Turso ready at %s", _endpoint())
+
+
+def describe() -> str:
+    """Human-readable backend name, for the doctor and startup logs."""
+    return f"Turso ({_endpoint()})" if REMOTE else str(DB_PATH)
+
+
+def connect() -> sqlite3.Connection | None:
+    """The local SQLite connection, or None when storage is remote."""
     global _conn
+    if REMOTE:
+        _remote_schema()
+        return None
     if _conn is None:
         with _lock:
             if _conn is None:
@@ -189,17 +332,27 @@ def connect() -> sqlite3.Connection:
     return _conn
 
 
-def query(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
+def query(sql: str, params: tuple = ()) -> list:
+    if REMOTE:
+        _remote_schema()
+        return _pipeline([(sql, params)])[0]
     with _lock:
         return connect().execute(sql, params).fetchall()
 
 
-def one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
+def one(sql: str, params: tuple = ()):
+    if REMOTE:
+        rows = query(sql, params)
+        return rows[0] if rows else None
     with _lock:
         return connect().execute(sql, params).fetchone()
 
 
 def write(sql: str, params: tuple = ()) -> None:
+    if REMOTE:
+        _remote_schema()
+        _pipeline([(sql, params)])
+        return
     with _lock:
         conn = connect()
         conn.execute(sql, params)
@@ -208,6 +361,10 @@ def write(sql: str, params: tuple = ()) -> None:
 
 def write_many(statements: list[tuple[str, tuple]]) -> None:
     """Run several statements in one transaction."""
+    if REMOTE:
+        _remote_schema()
+        _pipeline([("BEGIN", ())] + list(statements) + [("COMMIT", ())])
+        return
     with _lock:
         conn = connect()
         for sql, params in statements:

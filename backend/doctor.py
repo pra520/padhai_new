@@ -286,7 +286,7 @@ def check_pipeline() -> None:
         from services import db
         db.connect()
         n = db.one("SELECT COUNT(*) AS n FROM documents")["n"]
-        print(ok(f"database — reachable at {db.DB_PATH.name} ({n} documents)"))
+        print(ok(f"database — reachable at {db.describe()} ({n} documents)"))
     except Exception as exc:
         print(bad(f"database — {exc}"))
         findings.append(f"Database problem: {exc}")
